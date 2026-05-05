@@ -15,7 +15,8 @@ http {
         add_header X-Deployed-By "swiftdeploy" always;
         
         location / {
-            proxy_pass http://app:{{ service_port }};
+            set $upstream "app:{{ service_port }}";
+            proxy_pass http://$upstream;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_pass_header X-Mode;
