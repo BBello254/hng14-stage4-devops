@@ -2,6 +2,11 @@
 import yaml
 from jinja2 import Environment, FileSystemLoader
 import sys
+import subprocess
+import socket
+import os
+import urllib.request #used for making http request
+import time
 
 def run_init():
     with open("manifest.yaml") as f:
@@ -35,13 +40,103 @@ def run_init():
     print("Generated docker-compose.yml")
 
 def run_validate():
-    pass
+    print("Running validation checks")
+    try:
+        with open("manifest.yaml") as f:
+            manifest = yaml.safe_load(f)
+            print("manifest.yaml exist, and is valid YAML")
+    except:
+        print("manifest.yaml is missing or invalid yaml")
+        sys.exit(1)
+
+    required_fields = [
+        manifest["services"].get("image"),
+        manifest["services"].get("port"),
+        manifest["services"].get("version"),
+        manifest["services"].get("mode"),
+        manifest["network"].get("name"),
+        manifest["services"].get("log_volume"),
+        manifest["services"].get("restart_policy"),
+        manifest["nginx"].get("image"),
+        manifest["nginx"].get("port"),
+        manifest["nginx"].get("proxy_timeout"),
+        manifest["network"].get("driver_type")
+    ]
+    if not all(required_fields):
+        print("Required fields are missing or empty")
+        sys.exit(1)
+
+    else:
+        print("All required fields are present and not empty")
+    
+    result = subprocess.run(
+        ["docker", "image", "inspect", manifest["services"]["image"]],
+        capture_output=True
+    )
+    if result.returncode != 0:
+        print("Docker image not found")
+        sys.exit(1)
+    else:
+        print("Docker image exists")
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    result = sock.connect_ex(("localhost", manifest["nginx"]["port"]))
+    sock.close()
+    if result == 0:
+        print("Nginx port is already in use")
+        sys.exit(1)
+    else:
+        print("Nginx port is availaible")
+
+    result = subprocess.run(
+        ["nginx", "-t", "-c", os.path.abspath("nginx.conf")],
+        capture_output=True
+    )
+    if result.returncode != 0:
+        print("Nginx.conf is not syntactically valid")
+        sys.exit(1)
+    else:
+        print("Nginx.conf is syntatically valid")
+
 def run_deploy():
-    pass
+    run_init()
+    result = subprocess.run(
+        ["docker", "compose", "up", "-d"],
+        capture_output=True
+    )
+    start = time.time()
+    while True:
+        try:
+            urllib.request.urlopen("http://localhost:8080/healthz")
+            print("Stack is healthy")
+            return
+        except:
+            pass
+        if time.time() - start > 60:
+            print("Timed out after 60 seconds")
+            sys.exit(1)
+        time.sleep(5)
+
+
 def run_promote(mode):
-    pass
+    with open("manifest.yaml") as f:
+        manifest = yaml.safe_load(f)
+    manifest["services"]["mode"] = mode
+    with open("manifest.yaml", "w") as f:
+        yaml.dump(manifest, f)
+    run_init()
+    subprocess.run(["docker", "compose", "restart", "app"])
+    urllib.request.urlopen("http://localhost:8080/healthz")
+    print(f"Promoted to {mode} mode")
+
 def run_teardown():
-    pass
+    subprocess.run(["docker", "compose", "down", "-v"])
+    print("stack torn down")
+    if "--clean" in sys.argv:
+        os.remove("nginx.conf")
+        os.remove("docker-compose.yml")
+        print("Generated configs deleted")
+        
 
 command = sys.argv[1] if len(sys.argv) > 1 else ""
 
