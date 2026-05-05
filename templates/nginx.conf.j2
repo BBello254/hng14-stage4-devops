@@ -1,6 +1,8 @@
 events {}
 
 http {
+    resolver 127.0.0.11 valid=30s;
+    
     log_format custom '$time_iso8601 | $status | $request_time | $upstream_addr | $request';
 
     server {
