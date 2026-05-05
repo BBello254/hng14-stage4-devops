@@ -1,0 +1,41 @@
+version: '3.8'
+services:
+    app:
+        image: {{service_image}}
+        environment: 
+            - MODE={{service_mode}}
+            - APP_VERSION={{service_version}}
+            - APP_PORT={{service_port}}
+        networks: 
+            - {{network_name}}
+        restart: {{restart_policy}}
+        expose: 
+            - {{service_port}}
+        volumes: 
+            - {{log_volume}}:/app/logs
+        cap_drop: 
+            - ALL
+        healthcheck:
+             test: ["CMD", "curl", "-f", "http://localhost:{{service_port}}/healthz"]
+             interval: 10s 
+             timeout: 5s
+             retries: 3
+    nginx:
+        image: {{nginx_image}}
+        ports: 
+            - "{{nginx_port}}:{{nginx_port}}"
+        volumes: 
+            - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+        networks: 
+            - {{network_name}}
+        restart: {{restart_policy}}
+        depends_on: 
+            app:
+                condition: service_healthy
+networks:
+    {{network_name}}:
+        driver: {{network_driver}}
+
+volumes:
+    {{log_volume}}:
+
