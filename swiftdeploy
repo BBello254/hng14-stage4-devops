@@ -11,6 +11,7 @@ import time
 def run_init():
     with open("manifest.yaml") as f:
         manifest = yaml.safe_load(f)
+
     env = Environment(loader=FileSystemLoader("templates/"))
     template = env.get_template("nginx.conf.j2")
     rendered = template.render(
@@ -18,6 +19,7 @@ def run_init():
         nginx_port=manifest["nginx"]["port"],
         proxy_timeout=manifest["nginx"]["proxy_timeout"]
     )
+
     with open("nginx.conf","w") as f:
         f.write(rendered)
 
@@ -34,8 +36,10 @@ def run_init():
        nginx_port=manifest["nginx"]["port"],
        network_driver=manifest["network"]["driver_type"]
     )
+
     with open("docker-compose.yml","w") as f:
         f.write(rendered)
+
     print("Generated nginx.conf")
     print("Generated docker-compose.yml")
 
@@ -62,6 +66,7 @@ def run_validate():
         manifest["nginx"].get("proxy_timeout"),
         manifest["network"].get("driver_type")
     ]
+
     if not all(required_fields):
         print("Required fields are missing or empty")
         sys.exit(1)
@@ -82,6 +87,7 @@ def run_validate():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     result = sock.connect_ex(("localhost", manifest["nginx"]["port"]))
     sock.close()
+    
     if result == 0:
         print("Nginx port is already in use")
         sys.exit(1)
@@ -100,38 +106,74 @@ def run_validate():
 
 def run_deploy():
     run_init()
+
+    with open("manifest.yaml") as f:
+        manifest = yaml.safe_load(f)
+
     result = subprocess.run(
         ["docker", "compose", "up", "-d"],
-        capture_output=True
+        capture_output=True,
+        text=True
     )
+
+    if result.returncode != 0:
+        print("Docker Compose failed")
+        print(result.stderr)
+        sys.exit(1)
+
+    health_url = f"http://localhost:{manifest['nginx']['port']}/healthz"
+
     start = time.time()
+
     while True:
         try:
-            urllib.request.urlopen("http://localhost:8080/healthz")
+            urllib.request.urlopen(health_url)
             print("Stack is healthy")
             return
         except:
             pass
+
         if time.time() - start > 60:
             print("Timed out after 60 seconds")
             sys.exit(1)
+
         time.sleep(5)
 
-
 def run_promote(mode):
+    if mode not in ["stable", "canary"]:
+        print("Usage: ./swiftdeploy promote [stable|canary]")
+        sys.exit(1)
+
     with open("manifest.yaml") as f:
         manifest = yaml.safe_load(f)
+
     manifest["services"]["mode"] = mode
+
     with open("manifest.yaml", "w") as f:
         yaml.dump(manifest, f)
+
     run_init()
-    subprocess.run(["docker", "compose", "restart", "app"])
-    urllib.request.urlopen("http://localhost:8080/healthz")
+
+    result = subprocess.run(
+        ["docker", "compose", "restart", "app"],
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print("Failed to restart app container")
+        print(result.stderr)
+        sys.exit(1)
+
+    health_url = f"http://localhost:{manifest['nginx']['port']}/healthz"
+    urllib.request.urlopen(health_url)
+
     print(f"Promoted to {mode} mode")
 
 def run_teardown():
     subprocess.run(["docker", "compose", "down", "-v"])
     print("stack torn down")
+
     if "--clean" in sys.argv:
         os.remove("nginx.conf")
         os.remove("docker-compose.yml")
@@ -142,14 +184,22 @@ command = sys.argv[1] if len(sys.argv) > 1 else ""
 
 if command == "init":
     run_init()
+
 elif command == "validate":
     run_validate()
+
 elif command == "deploy":
     run_deploy()
+
 elif command == "promote":
+    if len(sys.argv) < 3:
+        print("Usage: ./swiftdeploy promote [stable|canary]")
+        sys.exit(1)
     run_promote(sys.argv[2])
+
 elif command == "teardown":
     run_teardown()
+    
 else: 
     print("Usage: ./swiftdeploy [init|validate|deploy|promote|teardown]")
     sys.exit(1)
