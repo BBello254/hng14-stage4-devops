@@ -1,10 +1,6 @@
 events {}
 
 http {
-    upstream app_service {
-    server app:{{ service_port }};
-    }
-
     server {
         listen {{ nginx_port }};
     
@@ -16,7 +12,8 @@ http {
         proxy_send_timeout {{ proxy_timeout }}s;
 
         location / {
-            proxy_pass http://app_service;
+            set $upstream app:{{ service_port }};
+            proxy_pass http://$upstream;
             add_header X-Deployed-By "swiftdeploy";
             proxy_set_header X-Mode $upstream_http_x_mode;
         }
