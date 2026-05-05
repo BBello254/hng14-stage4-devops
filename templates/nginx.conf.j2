@@ -12,11 +12,13 @@ http {
         proxy_read_timeout {{ proxy_timeout }}s;
         proxy_send_timeout {{ proxy_timeout }}s;
 
+        add_header X-Deployed-By "swiftdeploy" always;
+        
         location / {
-            set $upstream app:{{ service_port }};
-            proxy_pass http://$upstream;
-            add_header X-Deployed-By "swiftdeploy";
-            proxy_set_header X-Mode $upstream_http_x_mode;
+            proxy_pass http://app:{{ service_port }};
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_pass_header X-Mode;
         }
 
         error_page 502 503 504 @error_json;
