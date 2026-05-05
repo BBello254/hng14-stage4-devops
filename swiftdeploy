@@ -165,8 +165,18 @@ def run_promote(mode):
         print(result.stderr)
         sys.exit(1)
 
-    health_url = f"http://localhost:{manifest['nginx']['port']}/healthz"
-    urllib.request.urlopen(health_url)
+   health_url = f"http://localhost:{manifest['nginx']['port']}/healthz"
+
+    start = time.time()
+    while True:
+        try:
+            urllib.request.urlopen(health_url)
+            break
+        except:
+            if time.time() - start > 60:
+                print("Timed out after 60 seconds")
+                sys.exit(1)
+            time.sleep(2)
 
     print(f"Promoted to {mode} mode")
 
