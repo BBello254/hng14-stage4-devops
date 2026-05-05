@@ -155,7 +155,7 @@ def run_promote(mode):
     run_init()
 
     result = subprocess.run(
-        ["docker-compose", "restart", "app"],
+        ["docker-compose", "up", "-d", "--no-deps", "--force-recreate", "app"],
         capture_output=True,
         text=True
     )
