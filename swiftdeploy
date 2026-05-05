@@ -165,7 +165,7 @@ def run_promote(mode):
         print(result.stderr)
         sys.exit(1)
 
-   health_url = f"http://localhost:{manifest['nginx']['port']}/healthz"
+    health_url = f"http://localhost:{manifest['nginx']['port']}/healthz"
 
     start = time.time()
     while True:
