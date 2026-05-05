@@ -1,7 +1,7 @@
 events {}
 
 http {
-    log_format custom '$time_iso8601 | $status | ${request_time}s | $upstream_addr | $request';
+    log_format custom '$time_iso8601 | $status | $request_time | $upstream_addr | $request';
 
     server {
         listen {{ nginx_port }};
