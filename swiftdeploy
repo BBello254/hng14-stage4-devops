@@ -111,7 +111,7 @@ def run_deploy():
         manifest = yaml.safe_load(f)
 
     result = subprocess.run(
-        ["docker", "compose", "up", "-d"],
+        ["docker-compose", "up", "-d"],
         capture_output=True,
         text=True
     )
@@ -199,7 +199,7 @@ elif command == "promote":
 
 elif command == "teardown":
     run_teardown()
-    
+
 else: 
     print("Usage: ./swiftdeploy [init|validate|deploy|promote|teardown]")
     sys.exit(1)
